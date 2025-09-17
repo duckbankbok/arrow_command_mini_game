@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arrow Command Mini-Game</title>
+  <style>
+    :root{
+      --bg:#0f1220;--panel:#151a2e;--panel2:#1b2140;--text:#e8ecff;--muted:#9aa3c7;
+      --accent:#6e9bff;--good:#35d49a;--bad:#ff6b6b;--warn:#ffd166;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(160deg,#0b0f1c,#121935);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Pretendard,Arial,sans-serif}
+    .wrap{max-width:980px;margin:24px auto;padding:20px}
+    h1{font-size:22px;margin:0 0 12px}
+    .grid{display:grid;grid-template-columns:1.2fr 1fr;gap:16px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid #24305a;border-radius:16px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    label{font-size:12px;color:var(--muted)}
+    input,select,button{background:#0f1533;color:var(--text);border:1px solid #2a3870;border-radius:10px;padding:8px 10px;font-size:14px}
+    input[type="number"]{width:84px}
+    button{cursor:pointer;background:linear-gradient(180deg,#2746a0,#1f347d);border-color:#1d2b6a}
+    button.secondary{background:#182045}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .timer{height:14px;background:#0b112d;border:1px solid #2a3870;border-radius:999px;overflow:hidden}
+    .bar{height:100%;width:0%;background:linear-gradient(90deg,#6e9bff,#35d49a)}
+    .big{font-size:48px;letter-spacing:6px;text-align:center}
+    .seq{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+    .tile{width:54px;height:54px;border-radius:12px;border:1px solid #2b3666;background:#0f1533;display:grid;place-items:center;font-size:28px}
+    .tile.pending{opacity:.6}
+    .tile.done{border-color:#2c996a;background:rgba(53,212,154,.12)}
+    .tile.fail{border-color:#b74848;background:rgba(255,107,107,.12)}
+    .stat{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+    .pill{background:#0e1536;border:1px solid #2a3870;border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
+    .stage{font-size:13px;color:var(--muted)}
+    .flash{animation:flash .25s ease}
+    @keyframes flash{from{transform:scale(1.03)}to{transform:scale(1)}}
+    .center{display:flex;align-items:center;justify-content:center}
+    .rest{color:var(--warn);font-weight:600}
+    .log{font-family:ui-monospace,Consolas,Menlo,monospace;background:#0b1026;border:1px solid #203064;border-radius:12px;padding:10px;height:140px;overflow:auto;color:#bcd1ff;font-size:12px}
+    .kbd{font:12px ui-monospace,Consolas,Menlo,monospace;background:#0e1638;border:1px solid #2a3870;border-radius:6px;padding:3px 6px;color:#bcd1ff}
+    .footer{margin-top:14px;color:#93a2d8;font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Arrow Command Mini-Game <span style="color:var(--muted);font-weight:400">— 20초 데모</span></h1>
+    <div class="grid">
+      <div class="card">
+        <div class="row" style="justify-content:space-between;margin-bottom:8px">
+          <div class="row" style="gap:14px">
+            <div>
+              <label>제한 시간(초)</label><br />
+              <input id="timeLimit" type="number" min="5" max="120" step="1" value="20" />
+            </div>
+            <div>
+              <label>시작 방향키 개수</label><br />
+              <input id="startLen" type="number" min="3" max="10" step="1" value="4" />
+            </div>
+            <div>
+              <label>최대 방향키 개수</label><br />
+              <input id="maxLen" type="number" min="3" max="12" step="1" value="6" />
+            </div>
+            <div>
+              <label>성공 시 휴식(초)</label><br />
+              <input id="restSec" type="number" min="0" max="5" step="0.1" value="2" />
+            </div>
+            <div>
+              <label>길이 증가 조건</label><br />
+              <select id="incEvery">
+                <option value="2" selected>성공 2회마다 +1</option>
+                <option value="3">성공 3회마다 +1</option>
+              </select>
+            </div>
+            <div>
+              <label>실패 처리</label><br />
+              <select id="failMode">
+                <option value="replace" selected>같은 길이로 즉시 새 커맨드</option>
+                <option value="ignore">실패 무시(성공할 때까지 진행)</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <button id="startBtn">시작</button>
+            <button id="stopBtn" class="secondary" disabled>중지</button>
+          </div>
+        </div>
+
+        <div class="timer" aria-label="남은 시간">
+          <div id="bar" class="bar"></div>
+        </div>
+
+        <div id="status" class="center" style="height:64px;margin-top:8px"></div>
+
+        <div class="stage" id="stageInfo">스테이지 대기 중</div>
+
+        <div id="seq" class="seq" style="margin-top:10px"></div>
+
+        <div class="stat">
+          <div class="pill" id="pillLen">길이 L: -</div>
+          <div class="pill" id="pillNeed">다음 증가까지 성공: -</div>
+          <div class="pill" id="pillStage">스테이지(시도): 0</div>
+          <div class="pill" id="pillSucc">성공: 0</div>
+          <div class="pill" id="pillKPS">입력속도(가정): 0.33초/키</div>
+          <div class="pill" id="pillResult">-</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="margin-bottom:6px;color:var(--muted)">
+          <b>조작</b> — 키보드 <span class="kbd">←</span> <span class="kbd">→</span> <span class="kbd">↑</span> <span class="kbd">↓</span>
+        </div>
+        <ul style="margin:8px 0 14px 18px;color:#c9d6ff;line-height:1.6">
+          <li>표시된 순서대로 방향키를 입력하세요. (스테이지 = 커맨드 1개)</li>
+          <li>성공 2회/3회마다 길이가 +1, 최대 길이는 설정값까지.</li>
+          <li>성공 시 휴식 애니메이션 동안 입력이 잠시 잠금됩니다.</li>
+          <li>실패 처리 모드에 따라: 즉시 새로운 커맨드(기본) 또는 성공할 때까지 계속.</li>
+        </ul>
+        <div class="log" id="log"></div>
+        <div class="footer">Tip: 시도(스테이지) 수와 성공 수를 비교해 밸런스를 가늠해보세요.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const ARROWS = ["ArrowLeft","ArrowUp","ArrowRight","ArrowDown"];
+  const ARROW_EMOJI = {ArrowLeft:"←", ArrowUp:"↑", ArrowRight:"→", ArrowDown:"↓"};
+  const $ = sel => document.querySelector(sel);
+  const elSeq = $('#seq');
+  const elBar = $('#bar');
+  const elStatus = $('#status');
+  const elLog = $('#log');
+  const pillLen = $('#pillLen');
+  const pillNeed = $('#pillNeed');
+  const pillStage = $('#pillStage');
+  const pillSucc = $('#pillSucc');
+  const pillResult = $('#pillResult');
+  const stageInfo = $('#stageInfo');
+
+  const inputEls = {
+    timeLimit: $('#timeLimit'), startLen: $('#startLen'), maxLen: $('#maxLen'),
+    restSec: $('#restSec'), incEvery: $('#incEvery'), failMode: $('#failMode'),
+    startBtn: $('#startBtn'), stopBtn: $('#stopBtn')
+  };
+
+  let state = {};
+  const rnd = (n)=>Math.floor(Math.random()*n);
+
+  function makeSequence(L){
+    const seq = Array.from({length:L}, ()=> ARROWS[rnd(ARROWS.length)]);
+    return seq;
+  }
+
+  function renderSequence(seq, idx){
+    elSeq.innerHTML = '';
+    seq.forEach((code, i)=>{
+      const div = document.createElement('div');
+      div.className = 'tile' + (i<idx? ' done':' pending');
+      div.textContent = ARROW_EMOJI[code];
+      elSeq.appendChild(div);
+    });
+  }
+
+  function setStatus(text, cls=''){
+    elStatus.innerHTML = `<div class="${cls}">${text}</div>`;
+  }
+
+  function log(msg){
+    const t = ((performance.now()-state.t0)/1000).toFixed(2);
+    elLog.innerHTML += `[${t}s] ${msg}<br/>`;
+    elLog.scrollTop = elLog.scrollHeight;
+  }
+
+  function updatePills(){
+    pillLen.textContent = `길이 L: ${state.L}`;
+    pillNeed.textContent = `다음 증가까지 성공: ${state.incEvery - (state.succAtL % state.incEvery)}`;
+    pillStage.textContent = `스테이지(시도): ${state.stages}`;
+    pillSucc.textContent = `성공: ${state.successes}`;
+  }
+
+  function newCommand(sameLength=false){
+    if(!sameLength){
+      // Check increase length by success rule already handled elsewhere
+    }
+    state.seq = makeSequence(state.L);
+    state.idx = 0;
+    renderSequence(state.seq, state.idx);
+    stageInfo.textContent = `현재 커맨드 길이 L=${state.L}`;
+    setStatus('입력 대기...', '');
+  }
+
+  function onSuccessCommand(){
+    state.successes++;
+    state.succAtL++;
+    setStatus('성공! 휴식 중...', 'rest flash');
+    log(`성공 (L=${state.L}). 누적 성공 ${state.successes}`);
+    updatePills();
+
+    // increase length if needed
+    if(state.succAtL % state.incEvery === 0){
+      state.L = Math.min(state.L + 1, state.maxLen);
+      state.succAtL = 0; // reset counter at new L
+      log(`길이 증가 → L=${state.L}`);
+    }
+
+    // rest
+    state.locked = true;
+    const restMs = state.restSec*1000;
+    setTimeout(()=>{
+      state.locked = false;
+      newCommand(true);
+    }, restMs);
+  }
+
+  function onFailCommand(){
+    log(`실패 (L=${state.L})`);
+    if(state.failMode === 'replace'){
+      newCommand(true); // same length, fresh sequence
+    } else {
+      // ignore fail: keep working on the same sequence, reset progress
+      state.idx = 0;
+      renderSequence(state.seq, state.idx);
+      setStatus('다시 시도!', '');
+    }
+  }
+
+  function keyHandler(e){
+    if(!state.running || state.locked) return;
+    if(!ARROWS.includes(e.code)) return;
+    e.preventDefault();
+
+    const need = state.seq[state.idx];
+    const tiles = elSeq.children;
+
+    if(e.code === need){
+      tiles[state.idx]?.classList.remove('pending');
+      tiles[state.idx]?.classList.add('done','flash');
+      state.idx++;
+      if(state.idx === state.seq.length){
+        state.stages++; // one command attempt completed (success)
+        updatePills();
+        onSuccessCommand();
+      }
+    } else {
+      // mark wrong
+      tiles[state.idx]?.classList.add('fail','flash');
+      state.stages++; // failed attempt also counts as a stage (attempt)
+      updatePills();
+      onFailCommand();
+    }
+  }
+
+  function startGame(){
+    // init state
+    state = {
+      running:true, locked:false,
+      timeLimit: Math.max(5, Number(inputEls.timeLimit.value)||20),
+      L: Number(inputEls.startLen.value)||4,
+      maxLen: Number(inputEls.maxLen.value)||6,
+      restSec: Number(inputEls.restSec.value)||2,
+      incEvery: Number(inputEls.incEvery.value)||2,
+      failMode: inputEls.failMode.value,
+      seq:[], idx:0,
+      successes:0, succAtL:0, stages:0,
+      t0: performance.now(),
+      endAt: null, rafId: null
+    };
+    state.endAt = state.t0 + state.timeLimit*1000;
+    inputEls.startBtn.disabled = true;
+    inputEls.stopBtn.disabled = false;
+    Object.values(inputEls).forEach(el=>{ if(el.tagName==='INPUT'||el.tagName==='SELECT') el.disabled = true; });
+    elLog.innerHTML='';
+    pillResult.textContent='-';
+    log(`게임 시작 (제한 ${state.timeLimit}s, L=${state.L}~${state.maxLen}, 성공 ${state.incEvery}회마다 +1, 휴식 ${state.restSec}s, 실패:${state.failMode})`);
+    newCommand(true);
+    loop();
+    window.addEventListener('keydown', keyHandler);
+  }
+
+  function stopGame(final=false){
+    state.running = false;
+    window.removeEventListener('keydown', keyHandler);
+    cancelAnimationFrame(state.rafId);
+    inputEls.startBtn.disabled = false;
+    inputEls.stopBtn.disabled = true;
+    Object.values(inputEls).forEach(el=>{ if(el.tagName==='INPUT'||el.tagName==='SELECT') el.disabled = false; });
+    if(final){
+      const summary = `결과 — 스테이지(시도): ${state.stages}, 성공: ${state.successes}, 최종 L: ${state.L}`;
+      pillResult.textContent = summary;
+      setStatus('시간 종료!','');
+      log(summary);
+    } else {
+      setStatus('중지됨','');
+    }
+  }
+
+  function loop(){
+    const now = performance.now();
+    const left = Math.max(0, state.endAt - now);
+    const ratio = left/(state.timeLimit*1000);
+    elBar.style.width = `${(1-ratio)*100}%`;
+    if(left<=0){
+      stopGame(true);
+      return;
+    }
+    state.rafId = requestAnimationFrame(loop);
+  }
+
+  inputEls.startBtn.addEventListener('click', startGame);
+  inputEls.stopBtn.addEventListener('click', ()=> stopGame(false));
+})();
+</script>
+</body>
+</html>
