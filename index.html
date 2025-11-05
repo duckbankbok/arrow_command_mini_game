@@ -44,7 +44,7 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Arrow Command Mini-Game <span style="color:var(--muted);font-weight:400">— 40초 데모</span></h1>
+    <h1>Arrow Command Mini-Game <span style="color:var(--muted);font-weight:400">— 60초 데모</span></h1>
     <div class="grid">
       <div class="card">
         <div class="row" style="justify-content:space-between;margin-bottom:8px">
@@ -52,7 +52,7 @@
             <div>
               <label>제한 시간(초)</label><br />
               <!-- 기본값 40초 -->
-              <input id="timeLimit" type="number" min="5" max="120" step="1" value="40" />
+              <input id="timeLimit" type="number" min="5" max="120" step="1" value="60" />
             </div>
             <div>
               <label>시작 방향키 개수</label><br />
@@ -278,7 +278,7 @@
   function startGame(){
     state = {
       running:true, locked:false,
-      timeLimit: Math.max(5, Number(inputEls.timeLimit.value)||40),
+      timeLimit: Math.max(5, Number(inputEls.timeLimit.value)||60),
       L: Number(inputEls.startLen.value)||4,
       // 로직에서 상한 제한 없음: 사용자 입력 그대로 사용
       maxLen: Number(inputEls.maxLen.value)||6,
